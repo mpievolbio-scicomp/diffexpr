@@ -11,8 +11,16 @@ test_data_path = os.path.dirname(os.path.realpath(__file__)) + '/data'
 class DeseqTest(unittest.TestCase):
        
     def setUp(self):
-        self.htseq_dir = "/home/grotec/mnt/wallace/mnt/micropop/Data/NGS/MPGC/project4293/proc/htseq/chromosome/"
         
+        # Set up for htseq input.
+        self.htseq_dir = "/home/grotec/mnt/wallace/mnt/micropop/Data/NGS/MPGC/project4293/proc/htseq/chromosome/"
+        self.htseq_sample_table = pd.read_csv("/home/grotec/mnt/wallace/mnt/micropop/Data/NGS/MPGC/project4293/ref/4293_sampleTable.csv", 
+                                              sep="\t",
+                                              header=0,
+                                             )
+        self.htseq_sample_table.index = self.htseq_sample_table["fileName"]
+       
+        # Setup for dataframe input.
         self.df = pd.read_csv(test_data_path + '/ercc.tsv', sep='\t')
 
         self.sample_df = pd.DataFrame({'samplename': self.df.columns}) \
@@ -20,6 +28,7 @@ class DeseqTest(unittest.TestCase):
             .assign(sample = lambda d: d.samplename.str.extract('([AB])_', expand=False)) \
             .assign(batch = lambda d: d.samplename.str.extract('_([123])', expand=False)) 
         self.sample_df.index = self.sample_df.samplename
+        
         
     def test_construction(self):
         """ Test constructing a deseq object with count data and samplesheet."""
@@ -41,8 +50,8 @@ class DeseqTest(unittest.TestCase):
         
         dds = py_DESeq2(
                    htseq_dir = self.htseq_dir,
-                   design_matrix = self.sample_df,
-                   design_formula = '~ batch + sample',
+                   design_matrix = self.htseq_sample_table,
+                   design_formula = '~ condition',
         )
         
         self.assertIsInstance(dds, py_DESeq2)
