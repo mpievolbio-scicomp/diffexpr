@@ -29,14 +29,24 @@ class DeseqTest(unittest.TestCase):
             .assign(batch = lambda d: d.samplename.str.extract('_([123])', expand=False)) 
         self.sample_df.index = self.sample_df.samplename
         
+        self.__files_to_remove = []
+        
+    def tearDown(self):
+        for f in self.__files_to_remove:
+            try:
+                os.remove(f)
+            except:
+                continue
+        
         
     def test_construction(self):
         """ Test constructing a deseq object with count data and samplesheet."""
 
         dds = py_DESeq2(count_matrix = self.df,
-                   design_matrix = self.sample_df,
-                   design_formula = '~ batch + sample',
-                   gene_column = 'id')
+                        design_matrix = self.sample_df,
+                        design_formula = '~ batch + sample',
+                        gene_column = 'id',
+                       )
         
         self.assertIsInstance(dds, py_DESeq2)
             
@@ -49,14 +59,116 @@ class DeseqTest(unittest.TestCase):
         """ Test construction with htseq data. """
         
         dds = py_DESeq2(
+                        htseq_dir = self.htseq_dir,
+                        design_matrix = self.htseq_sample_table,
+                        design_formula = '~ condition',
+                        gene_column = 0,
+        )
+        
+        self.assertIsInstance(dds, py_DESeq2)
+        
+    def test_run_htseq(self):
+        """ Test running deseq with htseq data. """
+        
+        dds = py_DESeq2(
                    htseq_dir = self.htseq_dir,
                    design_matrix = self.htseq_sample_table,
                    design_formula = '~ condition',
         )
         
-        self.assertIsInstance(dds, py_DESeq2)
         
-    def test_run_deseq(self):
+        success = None
+        try:
+            dds.run_deseq() 
+            success = True
+        except:
+            success = False
+        finally:    
+            self.assertTrue(success)
+            
+    def test_results_htseq(self):
+        """ Test the results from a deseq run with htseq input. """
+        
+        # Setup.
+        dds = py_DESeq2(
+                   htseq_dir = self.htseq_dir,
+                   design_matrix = self.htseq_sample_table,
+                   design_formula = '~ condition',
+        )
+        
+        
+        # Run deseq.
+        dds.run_deseq() 
+        
+        success = None
+        try:
+            # Get results from R to py
+            dds.get_deseq_result()
+            success = True
+        except:
+            success = False
+        finally:    
+            self.assertTrue(success)
+            
+        # Get python results object (pandas.DataFrame).
+        res = dds.deseq_result 
+        
+        self.assertIsInstance(res, pd.DataFrame)
+        
+    def test_results_htseq_contrast(self):
+        """ Test the results from a deseq run with htseq input. Set the contrast manually """
+        
+        # Setup.
+        dds = py_DESeq2(
+                   htseq_dir = self.htseq_dir,
+                   design_matrix = self.htseq_sample_table,
+                   design_formula = '~ condition',
+        )
+        
+        # Run deseq.
+        dds.run_deseq() 
+        
+        success = None
+        try:
+            # Get results from R to py
+            dds.get_deseq_result(contrast=['condition', 'NZ13glu', 'NZ13d3glu'], alpha=0.3)
+            success = True
+        except:
+            success = False
+        finally:    
+            self.assertTrue(success)
+            
+        # Get python results object (pandas.DataFrame).
+        res = dds.deseq_result 
+        
+        self.assertIsInstance(res, pd.DataFrame)
+        
+    def test_results_htseq_contrast_save(self):
+        """ Test the results from a deseq run with htseq input. Set the contrast manually and save results."""
+        
+        # Setup.
+        dds = py_DESeq2(
+                   htseq_dir = self.htseq_dir,
+                   design_matrix = self.htseq_sample_table,
+                   design_formula = '~ condition',
+        )
+        
+        # Run deseq.
+        dds.run_deseq() 
+        
+        # Save with condition and contrast.
+        dds.get_deseq_result(contrast=['condition', 'NZ13glu', 'NZ13d3glu'], save=True, alpha=0.3)
+        self.assertIn("condition:NZ13glu__vs__NZ13d3glu.tsv", os.listdir())
+        
+        # Save with contrast=None
+        dds.get_deseq_result(save=True)
+        self.assertIn("deseq_results.tsv", os.listdir())
+        
+        self.__files_to_remove.append("condition:NZ13glu__vs__NZ13d3glu.tsv")
+        self.__files_to_remove.append("NZ13glu__vs__NZ13d3glu.tsv")
+        self.__files_to_remove.append("deseq_results.tsv")
+        
+    def test_run(self):
 
         df = pd.read_csv(test_data_path + '/ercc.tsv', sep='\t')
         """

@@ -57,6 +57,7 @@ class py_DESeq2:
         self.resLFC = None
         self.comparison = None
         self.normalized_count_df = None
+        self.gene_id = None
         self.gene_column = gene_column
         
         with localconverter(robjects.default_converter + pandas2ri.converter):
@@ -84,8 +85,6 @@ class py_DESeq2:
                                             design=self.design_formula)
         elif htseq_dir is not None:
             self.htseq_dir = htseq_dir
-            
-            # self.gene_id = count_matrix[self.gene_column]
             # self.samplenames = count_matrix.columns[count_matrix.columns != self.gene_column]
             # with localconverter(robjects.default_converter + pandas2ri.converter):
             #     self.count_matrix = robjects.conversion.py2rpy(
@@ -129,10 +128,22 @@ class py_DESeq2:
         self.comparison = list(deseq.resultsNames(self.dds))
 
 
-    def get_deseq_result(self, contrast=None, **kwargs):
+    def get_deseq_result(self, contrast=None, save=False, **kwargs):
         '''
         DESeq2: result(dds, contrast)
-        making a dds.deseq_result pandas dataframe
+        making a dds.deseq_result pandas dataframe, stored on the py_DESeq2 object.
+        
+        :param contrast: Specify which data to contrast. Must be a list of two or three strings.  Three strings specify the column label and column values in the design matrix, contrasts will be averaged over all other columns and rows. Two strings specify result names taken from deseq.resultsNames(dds). If None (default), results will be averaged over all conditions and treatments.
+        :type  contrast: list
+        :default contrast: None
+        
+        :param save: Request saving of results table to file. Results will be written to a tab separated values file. The filename is a concatenation of the `contrast` list. If `contrast` is None, filename will be *deseq_results.tsv*.
+        :type  save: bool
+        :default save: False
+        
+        :param **kwargs: Further keyword arguments to be passed on to deseq.results()
+        
+        :returns: None
         '''
 
         if contrast:
@@ -147,9 +158,21 @@ class py_DESeq2:
         else:
             self.result = deseq.results(self.dds, **kwargs) # R object
         self.deseq_result = to_dataframe(self.result) # R dataframe
+        
         with localconverter(robjects.default_converter + pandas2ri.converter):
             self.deseq_result = robjects.conversion.rpy2py(self.deseq_result) ## back to pandas dataframe
-        self.deseq_result[self.gene_column] = self.gene_id.values
+        if self.gene_id is not None:
+            self.deseq_result[self.gene_column] = self.gene_id.values
+            
+        if save:
+            if contrast is None:
+                fname = "deseq_results.tsv"
+            else:
+                fname = "__vs__".join(contrast[-2:]) + ".tsv"
+                if len(contrast) == 3:
+                    fname = contrast[0] + ":" + fname
+                
+            self.deseq_result.to_csv(fname, sep="\t", index=True, header=True)
 
     def normalized_count(self):
         '''
