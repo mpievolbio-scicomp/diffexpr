@@ -50,11 +50,6 @@ class DeseqTest(unittest.TestCase):
         
         self.assertIsInstance(dds, py_DESeq2)
             
-    @unittest.expectedFailure
-    def test_get_count_data(self):
-        raise NotImplementedError()
-        df = run_deseq._get_count_data(self.test_datadir)
-        
     def test_construction_htseq(self):
         """ Test construction with htseq data. """
         
